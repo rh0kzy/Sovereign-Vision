@@ -51,13 +51,22 @@ def parse_vedai_annotation(label_path):
             if not line or line.startswith("#"):
                 continue
             parts = line.split()
-            if len(parts) < 9:
+            if len(parts) < 14:
                 continue
             try:
+                # Extract 4 corner points (absolute pixels)
+                x1, y1 = float(parts[6]),  float(parts[7])
+                x2, y2 = float(parts[8]),  float(parts[9])
+                x3, y3 = float(parts[10]), float(parts[11])
+                x4, y4 = float(parts[12]), float(parts[13])
+
                 annotations.append({
-                    "cx": float(parts[1]), "cy": float(parts[2]),
-                    "angle": float(parts[3]), "w": float(parts[4]), "h": float(parts[5]),
-                    "occluded": int(parts[6]), "cut": int(parts[7]), "class_id": int(parts[8]),
+                    "cx":       float(parts[0]),
+                    "cy":       float(parts[1]),
+                    "class_id": int(parts[3]),
+                    "occluded": int(parts[4]),
+                    "cut":      int(parts[5]),
+                    "corners":  [(x1,y1),(x2,y2),(x3,y3),(x4,y4)],
                 })
             except (ValueError, IndexError):
                 continue
@@ -79,8 +88,12 @@ def convert_vedai_annotation(label_path, img_w, img_h, skip_occluded=False, skip
             stats["skipped_unknown"] += 1
             continue
         sv_class_id = VEDAI_TO_SV[vedai_cls]
-        x_min, y_min, x_max, y_max = rotated_bbox_to_aabb(
-            ann["cx"], ann["cy"], ann["w"], ann["h"], ann["angle"])
+
+        # Use corner points directly for AABB
+        xs = [c[0] for c in ann["corners"]]
+        ys = [c[1] for c in ann["corners"]]
+        x_min, y_min, x_max, y_max = min(xs), min(ys), max(xs), max(ys)
+
         x_min = max(0.0, x_min); y_min = max(0.0, y_min)
         x_max = min(float(img_w), x_max); y_max = min(float(img_h), y_max)
         if (x_max - x_min) < min_bbox_size or (y_max - y_min) < min_bbox_size:
@@ -111,8 +124,8 @@ def write_yolo_label(label_path, class_ids, bboxes):
 
 def find_image_for_annotation(label_stem, images_dir):
     for candidate in [
-        images_dir / f"co_{label_stem}.png",
-        images_dir / f"ir_{label_stem}.png",
+        images_dir / f"{label_stem}_co.png",   # color image
+        images_dir / f"{label_stem}_ir.png",   # infrared image
         images_dir / f"{label_stem}.png",
         images_dir / f"{label_stem}.jpg",
     ]:
