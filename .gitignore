@@ -1,0 +1,6 @@
+data/raw/
+data/processed/
+data/augmented/
+__pycache__/
+*.pyc
+.env
